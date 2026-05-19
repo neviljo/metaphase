@@ -24,10 +24,10 @@ export default function App() {
       {!playing ? (
         <HomeScreen onStart={handleStart} />
       ) : (
-        <>
+        <div style={{ position: 'relative', width: 980, height: 500 }}>
           <GameCanvas playerName={playerName} />
           <HUD hp={hp} maxHp={maxHp} nbConnected={nbConnected} latency={latency} />
-        </>
+        </div>
       )}
     </div>
   );

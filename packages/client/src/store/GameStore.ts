@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 interface GameState {
-  playerId: number | null;
+  playerId: string | null;
   playerName: string;
   hp: number;
   maxHp: number;
@@ -11,7 +11,7 @@ interface GameState {
   armor: string;
   alive: boolean;
 
-  setPlayerId: (id: number) => void;
+  setPlayerId: (id: string) => void;
   setPlayerName: (name: string) => void;
   setHp: (hp: number) => void;
   setMaxHp: (hp: number) => void;
@@ -24,7 +24,7 @@ interface GameState {
 }
 
 const initialState = {
-  playerId: null as number | null,
+  playerId: null as string | null,
   playerName: '',
   hp: 100,
   maxHp: 100,

@@ -17,6 +17,17 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    if (this.cache.audio.exists('intro')) {
+      if (!this.sound.locked) {
+        this.sound.play('intro', { loop: true, volume: 0.3 });
+      } else {
+        this.sound.once('unlocked', () => {
+          if (this.scene.isActive()) {
+            this.sound.play('intro', { loop: true, volume: 0.3 });
+          }
+        });
+      }
+    }
     this.scene.start('Game', { playerName: getPlayerName() });
   }
 }

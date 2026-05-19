@@ -229,6 +229,8 @@ export class GameScene extends Phaser.Scene {
         this.handleUpdate(msg.data);
         break;
       case 'pid':
+        this.selfPlayerId = parseInt(msg.playerID, 10);
+        useGameStore.getState().setPlayerId(msg.playerID);
         break;
       case 'chat':
         this.addChatMessage(msg.data.id, msg.data.text);
@@ -324,8 +326,6 @@ export class GameScene extends Phaser.Scene {
         }
         if (update.x !== undefined && update.y !== undefined) {
           if (id === this.selfPlayerId) {
-            this.expectedTileX = update.x;
-            this.expectedTileY = update.y;
             this.serverTileX = update.x;
             this.serverTileY = update.y;
           } else {
