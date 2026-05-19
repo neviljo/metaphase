@@ -71,7 +71,7 @@ export class MessageHandler {
   }
 
   private handlePath(msg: ClientMessage & { type: 'path' }): void {
-    const ok = this.gs.handlePath(msg.path, msg.action, msg.or, this.socketID);
+    const ok = this.gs.handlePath(msg.path, msg.action, msg.or, this.socketID, this.latency);
     if (!ok) {
       const pos = this.gs.getCurrentPosition(this.socketID);
       if (pos) this.send({ type: 'reset', data: pos });

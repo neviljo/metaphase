@@ -107,7 +107,7 @@ export class Being extends Phaser.GameObjects.Container {
       targets: this,
       x: targetX,
       y: targetY,
-      duration: dist > 32 ? this.moveTweenDuration : this.moveTweenDuration / 2,
+      duration: this.moveTweenDuration,
       ease: 'Linear',
       onComplete: () => {
         this.moveTween = null;

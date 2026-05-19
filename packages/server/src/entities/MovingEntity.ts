@@ -132,7 +132,6 @@ export abstract class MovingEntity extends GameObject {
     orientation: number = 4
   ): void {
     this.route = new Route(this.id, path, departureTime, latency, action, orientation);
-    this.lastWalkUpdate = departureTime;
   }
 
   damage(): void {

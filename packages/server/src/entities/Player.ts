@@ -17,6 +17,7 @@ export class Player extends MovingEntity {
   updatePacket: PersonalUpdatePacket;
   newAOIs: number[] = [];
   connected = true;
+  latency = 0;
 
   constructor(name: string) {
     super();

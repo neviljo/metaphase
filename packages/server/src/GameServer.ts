@@ -462,18 +462,82 @@ export class GameServer {
 
   // ── Path handling ──
 
+  extendRoute(
+    player: Player,
+    dest: TileCoord,
+    orientation: number,
+    action: GameAction
+  ): boolean {
+    const routeEnd = player.getPathEnd();
+    if (!routeEnd) return false;
+    if (routeEnd.x === dest.x && routeEnd.y === dest.y) return true;
+
+    // Don't extend if destination reverses direction
+    const path = player.route!.path;
+    if (path.length >= 2) {
+      const prev = path[path.length - 2];
+      const dirX = routeEnd.x - prev.x;
+      const dirY = routeEnd.y - prev.y;
+      const newDirX = dest.x - routeEnd.x;
+      const newDirY = dest.y - routeEnd.y;
+      if (dirX * newDirX + dirY * newDirY < 0) return false;
+    }
+
+    const gridClone = this.PFgrid.clone();
+    for (const key of Object.keys(this.monstersTable)) {
+      const m = this.monstersTable[Number(key)];
+      if (m.alive && !(m.x === player.x && m.y === player.y)) {
+        gridClone.setWalkableAt(m.x, m.y, false);
+      }
+    }
+    const rawPath = this.pathfinder.findPath(routeEnd.x, routeEnd.y, dest.x, dest.y, gridClone);
+    if (!rawPath || rawPath.length < 2) return false;
+
+    const extension = rawPath.slice(1).map((p: number[]) => ({ x: p[0], y: p[1] }));
+    for (const tile of extension) {
+      if (this.collisionGrid[tile.y]?.[tile.x]) return false;
+      const monstersOnTile = this.monsters.getFirstFiltered(tile.x, tile.y, ['alive']);
+      if (monstersOnTile) return false;
+    }
+
+    if (path.length + extension.length > 60) return false;
+
+    const start = path[0];
+    const newLast = extension[extension.length - 1];
+    if (manhattanDistance(start.x, start.y, newLast.x, newLast.y) > this.AOIheight + 8) return false;
+
+    path.push(...extension);
+    player.route!.orientation = orientation;
+    if (action) player.route!.action = action;
+
+    const routeAOIs = player.listAdjacentAOIs(true) as number[];
+    const routeData = player.route!.trim('player');
+    for (const aoi of routeAOIs) {
+      this.updateAOIRoute(aoi, 'player', player.id, routeData);
+    }
+    if (action && action.action === 3) {
+      const monster = this.monstersTable[action.id!];
+      if (monster && monster.alive) player.setTarget(monster);
+    }
+    return true;
+  }
+
   handlePath(
     path: TileCoord[],
     action: GameAction,
     orientation: number,
-    socketID: string
+    socketID: string,
+    latency = 0
   ): boolean {
     const player = this.getPlayer(socketID);
     if (!player || !player.alive) return false;
 
-    // Single destination path — compute full route server-side
+    // Single destination — try extending existing route first, else compute full path
     if (path.length === 1) {
       const dest = path[0];
+      if (player.route && this.extendRoute(player, dest, orientation, action)) {
+        return true;
+      }
       const gridClone = this.PFgrid.clone();
       for (const key of Object.keys(this.monstersTable)) {
         const m = this.monstersTable[Number(key)];
@@ -520,8 +584,9 @@ export class GameServer {
       }
     }
 
-    const departureTime = Date.now();
-    player.setRoute(path, departureTime, 0, action, orientation);
+    const departureTime = Date.now() - latency;
+    player.latency = latency;
+    player.setRoute(path, departureTime, latency, action, orientation);
     const routeAOIs = player.listAdjacentAOIs(true) as number[];
     const routeData = player.route!.trim('player');
     for (const aoi of routeAOIs) {
@@ -600,7 +665,7 @@ export class GameServer {
         type: 'update',
         data: {
           stamp: this.broadcaster.getShortStamp(),
-          latency: 0,
+          latency: player.latency ?? 0,
           nbconnected: Object.keys(this.players).length,
           ...finalPackage,
         },
