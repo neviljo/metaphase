@@ -18,15 +18,19 @@ export class Human extends Being {
       wordWrap: { width: maxWidth - padX * 2 },
       align: 'center',
     });
-    label.setOrigin(0.5);
-
     const bg = this.scene.add.graphics();
     const bw = Math.min(maxWidth, label.width + padX * 2);
     const bh = label.height + padY * 2;
+    const boxTop = -bh - 8;
+    const boxBottom = -8;
+    const boxCenterY = (boxTop + boxBottom) / 2;
     bg.fillStyle(0xffffff, 0.9);
-    bg.fillRoundedRect(-bw / 2, -bh - 8, bw, bh, 4);
+    bg.fillRoundedRect(-bw / 2, boxTop, bw, bh, 4);
     bg.lineStyle(1, 0x000000, 1);
-    bg.strokeRoundedRect(-bw / 2, -bh - 8, bw, bh, 4);
+    bg.strokeRoundedRect(-bw / 2, boxTop, bw, bh, 4);
+
+    label.setOrigin(0.5, 0.5);
+    label.setPosition(0, boxCenterY);
 
     this.bubble = this.scene.add.container(0, -40, [bg, label]);
     this.bubble.setDepth(50);

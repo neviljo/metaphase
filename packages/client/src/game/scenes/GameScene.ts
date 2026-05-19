@@ -13,6 +13,7 @@ import { Player } from '../entities/Player';
 import { Monster } from '../entities/Monster';
 import { ItemEntity } from '../entities/ItemEntity';
 import { NPC } from '../entities/NPC';
+import { Human } from '../entities/Human';
 import {
   createPlayerAnimations,
   createWeaponAnimations,
@@ -66,6 +67,17 @@ export class GameScene extends Phaser.Scene {
   private chatText!: Phaser.GameObjects.Text;
   private chatInputEl: HTMLInputElement | null = null;
   private monsterHPBars = new Map<number, Phaser.GameObjects.Graphics>();
+  private npcEntities: NPC[] = [];
+  private entitiesClientData: any = {};
+
+  private readonly ACH_WEAPON = 0;
+  private readonly ACH_OUTDOOR = 1;
+  private readonly ACH_RATS = 2;
+  private readonly ACH_TALK = 3;
+  private readonly ACH_ARMOR = 4;
+  private readonly ACH_SKELETONS = 5;
+  private readonly ACH_SOUTH = 6;
+  private readonly ACH_TOMB = 7;
 
   constructor() {
     super('Game');
@@ -105,6 +117,10 @@ export class GameScene extends Phaser.Scene {
 
     const highLayer = map.createLayer('highlayer0', tileset, 0, 0)!;
     highLayer.setDepth(4);
+
+    this.entitiesClientData = this.cache.json.get('entities_client') || {};
+    this.restoreAchievements();
+    this.spawnNPCs(map);
 
     this.createDeathOverlay();
     this.createChatUI();
@@ -328,6 +344,7 @@ export class GameScene extends Phaser.Scene {
           if (id === this.selfPlayerId) {
             this.serverTileX = update.x;
             this.serverTileY = update.y;
+            this.checkLocationAchievements(update.x, update.y);
           } else {
             ent.setPositionTile(update.x, update.y);
           }
@@ -453,12 +470,14 @@ export class GameScene extends Phaser.Scene {
       );
       const name = monsterKey ? (this.monstersInfo[monsterKey].name || monsterKey) : 'Monster';
       this.showNotification(`Killed ${name}!`, 2000);
+      this.checkKillAchievements(monsterId);
     }
     if (local.used && local.used.length > 0) {
       for (const itemId of local.used) {
         const itemKey = this.itemsIDmap[itemId];
         if (itemKey && this.itemsInfo[itemKey]) {
           this.showNotification(`You picked up ${this.itemsInfo[itemKey].name || itemKey}`, 2000);
+          this.checkEquipAchievements(itemId);
         } else {
           this.showNotification('You picked up an item', 2000);
         }
@@ -471,6 +490,7 @@ export class GameScene extends Phaser.Scene {
       this.selfPlayer.setPositionTile(local.x, local.y, true);
       this.expectedTileX = local.x;
       this.expectedTileY = local.y;
+      this.checkLocationAchievements(local.x, local.y);
     }
   }
 
@@ -709,5 +729,114 @@ export class GameScene extends Phaser.Scene {
     if (!item.visible) ent.setVisible(false);
     if (item.loot) ent.showSparkle();
     this.itemEntities.set(item.id, ent);
+  }
+
+  private spawnNPCs(map: Phaser.Tilemaps.Tilemap): void {
+    const npcInfo = this.db?.npc || {};
+    const entitiesLayer = map.getObjectLayer('entities');
+    if (!entitiesLayer) return;
+
+    for (const obj of entitiesLayer.objects as any[]) {
+      const gid = obj.gid as number;
+      if (!gid) continue;
+      const entityKey = gid - 1961;
+      const entityInfo = this.entitiesClientData[entityKey];
+      if (!entityInfo?.npc) continue;
+
+      const spriteKey = entityInfo.sprite as string;
+      const npcData = npcInfo[spriteKey];
+      if (!npcData) continue;
+
+      const tileX = Math.ceil(obj.x / map.tileWidth);
+      const tileY = Math.ceil(obj.y / map.tileHeight);
+      const dialogue: string[] = npcData.dialogue || [];
+
+      const npc = new NPC(this, tileX, tileY, spriteKey, dialogue);
+      if (npcData.customAnchor) {
+        npc.bodySprite.setOrigin(npcData.customAnchor.x, npcData.customAnchor.y);
+      }
+      this.npcEntities.push(npc);
+    }
+  }
+
+  private checkLocationAchievements(tileX: number, tileY: number): void {
+    const ach = this.db?.achievements;
+    if (!ach) return;
+    const store = useGameStore.getState();
+
+    for (const key of Object.keys(ach)) {
+      const a = ach[key];
+      if (!a.locationAchievement) continue;
+      const achId = parseInt(key);
+      if (store.achievements[achId]?.unlocked) continue;
+
+      const r = a.rect;
+      const inside = tileX >= r.x && tileX < r.x + r.w && tileY >= r.y && tileY < r.y + r.h;
+      const triggered = a.criterion === 'out' ? !inside : inside;
+      if (triggered) {
+        store.unlockAchievement(achId);
+        this.showNotification(`Achievement: ${a.name}!`, 3000);
+        this.saveAchievements();
+      }
+    }
+  }
+
+  private checkKillAchievements(monsterId: number): void {
+    const monsterKey = Object.keys(this.monstersInfo).find(
+      (k) => this.monstersInfo[k].id === monsterId
+    );
+    if (!monsterKey) return;
+    const store = useGameStore.getState();
+    store.incrementKillCounter(monsterKey);
+
+    const ratCount = store.killCounters['rat'] || 0;
+    if (ratCount >= 10 && !store.achievements[this.ACH_RATS]?.unlocked) {
+      store.unlockAchievement(this.ACH_RATS);
+      this.showNotification('Achievement: Angry Rats!', 3000);
+      this.saveAchievements();
+    }
+    const skelCount = store.killCounters['skeleton'] || 0;
+    if (skelCount >= 10 && !store.achievements[this.ACH_SKELETONS]?.unlocked) {
+      store.unlockAchievement(this.ACH_SKELETONS);
+      this.showNotification('Achievement: Bones Collector!', 3000);
+      this.saveAchievements();
+    }
+  }
+
+  private checkEquipAchievements(itemId: number): void {
+    const itemKey = this.itemsIDmap[itemId];
+    if (!itemKey) return;
+    const info = this.itemsInfo[itemKey];
+    if (!info) return;
+    const store = useGameStore.getState();
+
+    if (info.type === 1 && !store.achievements[this.ACH_WEAPON]?.unlocked) {
+      store.unlockAchievement(this.ACH_WEAPON);
+      this.showNotification('Achievement: A True Warrior!', 3000);
+      this.saveAchievements();
+    }
+    if (info.type === 2 && !store.achievements[this.ACH_ARMOR]?.unlocked) {
+      store.unlockAchievement(this.ACH_ARMOR);
+      this.showNotification('Achievement: Fat Loot!', 3000);
+      this.saveAchievements();
+    }
+  }
+
+  private restoreAchievements(): void {
+    const store = useGameStore.getState();
+    for (let i = 0; i < 8; i++) {
+      if (localStorage.getItem('ach' + i)) {
+        store.unlockAchievement(i);
+      }
+    }
+  }
+
+  private saveAchievements(): void {
+    const store = useGameStore.getState();
+    for (const [id, state] of Object.entries(store.achievements)) {
+      if (state.unlocked) {
+        localStorage.setItem('ach' + id, '1');
+      }
+    }
   }
 }

@@ -11,6 +11,7 @@ export class BootScene extends Phaser.Scene {
     this.load.atlas('atlas3', 'assets/sprites/atlas3.png', 'assets/sprites/atlas3.json');
     this.load.atlas('atlas4', 'assets/sprites/atlas4.png', 'assets/sprites/atlas4.json');
     this.load.json('db', 'assets/json/db.json');
+    this.load.json('entities_client', 'assets/json/entities_client.json');
     this.load.image('tilesheet', 'assets/tilesets/tilesheet.png');
     this.load.tilemapTiledJSON('map', 'assets/maps/minimap_client.json');
     this.load.audio('intro', ['assets/music/phaser-quest-intro.ogg']);

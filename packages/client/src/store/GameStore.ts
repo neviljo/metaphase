@@ -1,5 +1,10 @@
 import { create } from 'zustand';
 
+interface AchievementState {
+  unlocked: boolean;
+  unlockedAt?: number;
+}
+
 interface GameState {
   playerId: string | null;
   playerName: string;
@@ -11,16 +16,24 @@ interface GameState {
   armor: string;
   alive: boolean;
 
+  achievements: Record<number, AchievementState>;
+  killCounters: Record<string, number>;
+  chestOpens: number;
+
   setPlayerId: (id: string) => void;
   setPlayerName: (name: string) => void;
   setHp: (hp: number) => void;
-  setMaxHp: (hp: number) => void;
+  setMaxHp: (maxHp: number) => void;
   setNbConnected: (n: number) => void;
   setLatency: (ms: number) => void;
   setWeapon: (w: string) => void;
   setArmor: (a: string) => void;
   setAlive: (a: boolean) => void;
   reset: () => void;
+
+  unlockAchievement: (id: number) => void;
+  incrementKillCounter: (monsterKey: string) => void;
+  incrementChestOpens: () => void;
 }
 
 const initialState = {
@@ -33,6 +46,10 @@ const initialState = {
   weapon: 'sword1',
   armor: 'clotharmor',
   alive: true,
+
+  achievements: {} as Record<number, AchievementState>,
+  killCounters: {} as Record<string, number>,
+  chestOpens: 0,
 };
 
 export const useGameStore = create<GameState>((set) => ({
@@ -48,4 +65,23 @@ export const useGameStore = create<GameState>((set) => ({
   setArmor: (a) => set({ armor: a }),
   setAlive: (a) => set({ alive: a }),
   reset: () => set({ ...initialState }),
+
+  unlockAchievement: (id) =>
+    set((state) => ({
+      achievements: {
+        ...state.achievements,
+        [id]: { unlocked: true, unlockedAt: Date.now() },
+      },
+    })),
+
+  incrementKillCounter: (monsterKey) =>
+    set((state) => ({
+      killCounters: {
+        ...state.killCounters,
+        [monsterKey]: (state.killCounters[monsterKey] || 0) + 1,
+      },
+    })),
+
+  incrementChestOpens: () =>
+    set((state) => ({ chestOpens: state.chestOpens + 1 })),
 }));
