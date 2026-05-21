@@ -41,7 +41,7 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 | Protocol/broadcaster | ✅ | WS message dispatch, room management |
 | MongoDB persistence | ✅ | PlayerModel, save/load/delete |
 | Map format utility | ✅ | format.ts |
-| NPC class | ⚠️ | NPCs exist only as collision blockers; no dedicated NPC entity class |
+| NPC class (client) | ✅ | `NPC.ts` extends `Human`, spawned in GameScene, click-to-talk, dialogue, speech bubbles |
 
 **Dead code (not imported by any consumer):**
 - `systems/LootSystem.ts` 🗑️ — duplicate of CombatSystem functions
@@ -71,8 +71,8 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 | Player sprite | ✅ | Equipment overlay, animation prefix per armor/weapon |
 | Monster sprite | ✅ | Dynamic animation creation per monster type |
 | Item sprite | ✅ | Chest, sparkle, loot display |
-| NPC sprite | ✅ **Dead code** | `NPC.ts` exists (42 lines) but **never instantiated** in GameScene |
-| Human sprite | 🗑️ **Dead code** | `Human.ts` has `showBubble` but is **never imported** |
+| NPC sprite | ✅ | `NPC.ts` (69 lines) spawned in GameScene with click-to-talk, dialogue cycling, speech bubbles |
+| Human sprite | ✅ | `Human.ts` imported by `NPC.ts` — `showBubble()` renders speech bubbles in Phaser |
 
 ### 3.3 Game systems
 
@@ -99,8 +99,8 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 |---------|--------|-------|
 | WS send/receive | ✅ | JSON protocol |
 | MessageHandler class | 🗑️ **Dead code** | Defined but never imported; GameScene uses switch statement |
-| Heartbeat/ping-pong | ❌ | Client **never sends `ponq`** — no latency measurement |
-| `pid` handler | ⚠️ | Empty `break` in GameScene — player ID from server ignored |
+| Heartbeat/ping-pong | ⚠️ | Server handles `ponq` with rolling 20-sample median; client **never sends `ponq`** — latency stuck at 0ms |
+| `pid` handler | ✅ | Stores playerId in useGameStore |
 
 ---
 
@@ -113,7 +113,7 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 | Click-to-move | ✅ | ✅ | — |
 | Server pathfinding + anti-cheat | ✅ | ✅ | — |
 | Tile-based movement | ✅ | ✅ | — |
-| Latency compensation | ✅ | ⚠️ Client never sends `ponq` — no latency data | Medium |
+| Latency compensation | ✅ | ⚠️ Server handles `ponq` + 20-sample median; client never sends `ponq` — latency stuck at 0ms | Medium |
 | Move target marker | ✅ | ❌ | Low |
 | Orientation system (4-dir) | ✅ | ✅ | — |
 | Melee combat (adjacent tiles) | ✅ | ✅ | — |
@@ -123,11 +123,11 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 | Foe management | ✅ | ✅ | — |
 | 8 weapons + 6 armors | ✅ | ✅ (db.json) | — |
 | Equipment comparison / weaker reject | ✅ | ✅ Server-side `applyItem` | — |
-| NoPick notification | ✅ | ⚠️ Add `GameScene` handler for `noPick` field | Low |
+| NoPick notification | ✅ | ✅ Shows "Item not needed" notification (Phase A fix) | — |
 | Health regen (+2/2s) | ✅ | ✅ | — |
 | Death overlay / revive | ✅ | ✅ (GameScene) | — |
 | Last hitter tracking | ✅ | ✅ | — |
-| Achievements (8 types) | ✅ | ❌ No triggers, no store, no UI | Medium |
+| Achievements (8 types) | ✅ | ✅ Full trigger system in GameScene + NPC.ts; no AchievementsPanel UI | Medium |
 | Equipment icons in HUD | ✅ | ❌ | Low |
 
 ### 4.2 Monster features
@@ -176,11 +176,11 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 
 | Feature | Original | Current | Priority |
 |---------|----------|---------|----------|
-| 14 NPC types | ✅ | ⚠️ In db.json but **never spawned** | High |
-| Click-to-talk | ✅ | ❌ | High |
-| Speech bubbles (9-slice) | ✅ | ⚠️ `Human.showBubble` is dead code | High |
-| Dialogue arrays (multi-line) | ✅ | ❌ | High |
-| Talk cursor | ✅ | ❌ | High |
+| 15 NPC types | ✅ | ✅ Spawned in GameScene from map + db.json | — |
+| Click-to-talk | ✅ | ✅ NPC.ts `talk()` with 1.5s cooldown, dialogue cycling | — |
+| Speech bubbles | ✅ | ✅ `Human.showBubble()` renders rounded-rect + text in Phaser | — |
+| Dialogue arrays (multi-line) | ✅ | ✅ Array from db.json, cycles on each click | — |
+| Talk cursor | ✅ | ⚠️ `cursor: pointer` on hover (no custom graphic) | Low |
 | NPC collision blocking | ✅ | ✅ (setUpEntities) | — |
 
 ### 4.6 Chat features
@@ -190,7 +190,7 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 | Enter to toggle chat | ✅ | ✅ (GameScene) | — |
 | Chat broadcast to AOI | ✅ | ✅ | — |
 | 300 char limit | ✅ | ✅ | — |
-| Chat sound | ✅ | ❌ | Low |
+| Chat sound | ✅ | ✅ | — |
 | Chat bubble icon (bottom-right) | ✅ | ❌ | Low |
 
 ### 4.7 UI / HUD features
@@ -204,7 +204,7 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 | Connected player count | ✅ | ✅ (nbConnected in HUD) | — |
 | Latency display | ✅ | ✅ (HUD) | — |
 | Player equip icons in HUD | ✅ | ❌ | Low |
-| Achievement notifications | ✅ | ❌ | Medium |
+| Achievement notifications | ✅ | ✅ Calls `showNotification()` on each unlock in GameScene | — |
 | Kill / pickup notifications | ✅ | ✅ (showNotification) | — |
 | Loading bar (asset progress) | ✅ | ❌ | Low |
 | Home screen character preview | ✅ | ❌ | Medium |
@@ -218,21 +218,21 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 
 | Feature | Original | Current | Priority |
 |---------|----------|---------|----------|
-| Intro music (OGG) | ✅ | ✅ Loaded but **never played** | Medium |
-| Sound effects (9 types) | ✅ | ❌ **Never played** | Medium |
-| Sound mute toggle | ✅ | ❌ | Low |
+| Intro music (OGG) | ✅ | ✅ Loaded and played in BootScene (looped, vol 0.3, autoplay-handled) | — |
+| Sound effects (9 types) | ✅ | ✅ AudioManager.ts + playSound calls in GameScene | — |
+| Sound mute toggle | ✅ | ✅ HUD button toggles AudioManager.muted; also controls intro music now | — |
 | Audio file loading | ✅ | ✅ (BootScene) | — |
 
 ### 4.9 Achievement features
 
 | Feature | Original | Current | Priority |
 |---------|----------|---------|----------|
-| 8 achievement types | ✅ | ❌ | Medium |
-| Kill counters (rat, skeleton) | ✅ | ❌ | Medium |
-| Location-based triggers | ✅ | ❌ | Medium |
-| Speak-based triggers | ✅ | ❌ | Medium |
-| Chest open counter | ✅ | ❌ | Medium |
-| localStorage persistence | ✅ | ❌ | Medium |
+| 8 achievement types | ✅ | ✅ IDs defined (ACH_WEAPON..ACH_TOMB), unlocked in GameScene | — |
+| Kill counters (rat, skeleton) | ✅ | ✅ 10 rats → "Angry Rats", 10 skeletons → "Bones Collector" | — |
+| Location-based triggers | ✅ | ✅ Checked via db.achievements rects in GameScene | — |
+| Speak-based triggers | ✅ | ✅ NPC.talk() unlocks ACH_TALK (index 3) | — |
+| Chest open counter | ✅ | ✅ `chestOpens` tracked, unlocks ACH_CHEST (index 7) | — |
+| localStorage persistence | ✅ | ✅ `ach0`-`ach7` saved/restored in GameScene | — |
 | Achievement spark effects | ✅ | ❌ | Low |
 | Achievement sound | ✅ | ❌ | Low |
 
@@ -253,7 +253,7 @@ This document compares the **original PhaserQuest (BrowserQuest clone)** feature
 |---------|----------|---------|----------|
 | Socket.io → ws migration | ✅ | ✅ | — |
 | Binary protocol → JSON | ✅ | ✅ (intentional simplification) | — |
-| Latency estimation (median of 20) | ✅ | ❌ Client never sends `ponq` | Medium |
+| Latency estimation (median of 20) | ✅ | ⚠️ Server tracks 20 samples + median; client never sends `ponq` to trigger it | Medium |
 | AOI room management | ✅ | ✅ | — |
 
 ---
@@ -276,49 +276,48 @@ These are small fixes that unlock existing features:
 - ✅ **HUD overflow** — game area now wrapped in `position: relative` container so HUD anchors to the canvas, not the viewport
 - ✅ **Arrow-key movement snap-back** — client no longer overwrites `expectedTileX/Y` from server global position updates, allowing client-side prediction to stay ahead
 
-### Phase B: NPC SYSTEM
+### Phase B: NPC SYSTEM ✅
 
-This is the biggest missing gameplay feature — NPCs exist in db.json and the sprite class exists, but nothing connects them:
+Fully implemented — NPCs spawn, display speech bubbles, cycle dialogue on click, and unlock achievement on first talk:
 
-1. **Create NPC spawning in GameScene** — read NPC entities from `minimap_client.json` (or db.json's `npcs`), instantiate `NPC` sprites with speech bubbles
+1. ✅ **Create NPC spawning in GameScene** — reads NPC entities from map entities layer + `entities_client.json`, instantiates `NPC` sprites with dialogue from db.json
 
-2. **Wire speech bubble interaction** — reinstate `Human.showBubble()` by having `NPC` extend `Human` instead of `Being`, or merge the logic
+2. ✅ **Wire speech bubble interaction** — `Human.showBubble()` renders rounded-rect with text, auto-clears after 3.5s
 
-3. **Add click-to-talk handler** — on NPC click, cycle through dialogue array from db.json, show in speech bubble
+3. ✅ **Add click-to-talk handler** — `NPC.talk()` cycles dialogue array with 1.5s cooldown, unlocks `ACH_TALK`
 
-4. **Add talk cursor** — change cursor on NPC hover
+4. ✅ **Add talk cursor** — cursor changes to `'pointer'` on NPC hover (no custom graphic)
 
-### Phase C: ACHIEVEMENTS
+### Phase C: ACHIEVEMENTS ✅
 
-1. **Create achievement store/state** with 8 achievement types and progress tracking
+All core achievement functionality is implemented (missing only the React AchievementsPanel UI):
 
-2. **Wire kill counters** — increment in GameScene's `killed` handler
+1. ✅ **Create achievement store/state** — `GameStore` has `AchievementState`, `unlockAchievement()`, `killCounters`, `chestOpens`
 
-3. **Wire location triggers** — check player position on movement for "Into the Wild" and "World's End"
+2. ✅ **Wire kill counters** — 10 rats → "Angry Rats" (ACH_RATS=2), 10 skeletons → "Bones Collector" (ACH_SKELETONS=5)
 
-4. **Wire speak trigger** — track first NPC conversation
+3. ✅ **Wire location triggers** — checked via `db.achievements` collision rects in GameScene.updateSelf() on movement for "Into the Wild" (ACH_OUTDOOR=1) and "World's End" (ACH_SOUTH=6)
 
-5. **Wire chest open trigger** — count chest openings
+4. ✅ **Wire speak trigger** — `NPC.talk()` unlocks ACH_TALK (index 3) on first conversation
 
-6. **Add notification display** for achievement unlocks
+5. ✅ **Wire chest open trigger** — `chestOpens` counter incremented, unlocks ACH_TOMB (index 7)
 
-7. **Persist to localStorage** — `ach0`-`ach7` keys
+6. ✅ **Add notification display** — `showNotification()` called on each unlock
 
-### Phase D: AUDIO SYSTEM
+7. ✅ **Persist to localStorage** — `ach0`-`ach7` saved/restored in GameScene
 
-1. **Load all sound effects** in BootScene (from `sounds.json`)
+### Phase D: AUDIO SYSTEM ✅
 
-2. **Create audio manager** — play sounds on: hit, hurt, kill, heal, chest, chat, achievement, death, noloot
-
-3. **Add sound mute toggle** in HUD
+1. ✅ **Intro music** — loaded and played in BootScene (looped, volume 0.3, autoplay-handled via `sound.locked` event)
+2. ✅ **Sound effects** — 9 types loaded as audio sprite, played via AudioManager.playSound() in GameScene
+3. ✅ **Audio manager** — `AudioManager.ts` with muted flag, playSound gate, intro music registration
+4. ✅ **Sound mute toggle** — in HUD, toggles AudioManager.muted; now also pauses/resumes intro music
 
 ### Phase E: LATENCY MEASUREMENT
 
-1. **Send `ponq` from client** on each server update
-
-2. **Track last 20 samples** on server, compute median via quickselect
-
-3. **Apply latency compensation** to movement tweens (already partially in `Being.setPositionTile`)
+1. ❌ **Send `ponq` from client** — client never sends ping; no heartbeat or interval
+2. ✅ **Track last 20 samples** on server — `MessageHandler.ts` computes median latency via quickselect
+3. ❌ **Apply latency compensation** — `Being.setPositionTile` doesn't use delta; latency in update packet ignored
 
 ### Phase F: HOME SCREEN ENHANCEMENTS
 
@@ -334,7 +333,7 @@ This is the biggest missing gameplay feature — NPCs exist in db.json and the s
 
 2. **Self name highlighting** — gold color for own player
 
-3. **Equipment icons in HUD** — show current weapon + armor sprites
+3. **Equipment icons in HUD** — show current weapon + armor sprites (Zustand store already has `weapon`/`armor` fields; just wire them in GameScene `handleGlobalUpdate`)
 
 4. **Custom cursors** — loot cursor on items, fight cursor on monsters, talk cursor on NPCs
 
@@ -342,9 +341,11 @@ This is the biggest missing gameplay feature — NPCs exist in db.json and the s
 
 6. **Camera modes for doors** — apply fixed/bounded camera on teleport
 
-7. **InventoryDisplay React component** — create and wire
+7. **InventoryDisplay React component** — create and wire (reads from Zustand, no server changes needed)
 
 8. **AchievementsPanel React component** — create and wire
+
+9. **Responsive scaling (fill screen)** — add `Phaser.Scale.FIT` + `CENTER_BOTH` in `GameManager.ts`; update wrapper div + HUD CSS to use relative units instead of hardcoded 980x500
 
 ### Phase H: CLEANUP
 
@@ -367,15 +368,16 @@ This is the biggest missing gameplay feature — NPCs exist in db.json and the s
 ## 6. SUMMARY — What's Blocking Full Gameplay
 
 | Currently broken / missing | Root cause | Phase |
-|---|---|---|
+|---|---|---|---|
 | Monsters don't attack / no HP feedback | ✅ **FIXED** (combat pipeline wired) | — |
-| NPCs don't exist in game world | No GameScene NPC spawning logic | **B** |
-| Can't talk to NPCs | No click-to-talk handler, speech bubble dead code | **B** |
-| No achievements | No store, no triggers, no UI | **C** |
-| No sound effects | Audio loaded but never played | **D** |
-| Latency compensation broken | Client never sends `ponq` | **E** |
+| NPCs don't exist in game world | ✅ **FIXED** (NPCs spawned with click-to-talk + bubbles) | **B** |
+| Can't talk to NPCs | ✅ **FIXED** (click-to-talk cycles dialogue + achievement) | **B** |
+| No achievements | ✅ **FIXED** (8 types with triggers, storage, notifications) | **C** |
+| No sound effects | ✅ **FIXED** (AudioManager + SFX wired) | **D** |
+| Latency always 0ms | Client never sends `ponq` (server-side tracking done) | **E** |
 | Home screen always creates new char | No character load from localStorage | **F** |
 | No target marker | Missing UI feature | **G** |
+| No AchievementsPanel UI | Missing React component | **G** |
 | Memory leak on unmount | Missing Phaser destroy in GameCanvas | **H** |
 
 ---
@@ -390,6 +392,6 @@ This is the biggest missing gameplay feature — NPCs exist in db.json and the s
 | `MessageHandler.ts` | `packages/client/src/network/` | Unused | Delete or wire into WebSocketClient |
 | `MovementSystem.ts` | `packages/client/src/game/systems/` | Unused | Delete or migrate movement here |
 | `ChatBox.tsx` | `packages/client/src/components/` | Unused (React) | Delete or wire in App.tsx |
-| `Human.ts` | `packages/client/src/game/entities/` | Unused | Keep — needed for NPC speech bubbles |
-| `NPC.ts` | `packages/client/src/game/entities/` | Class exists, never instantiated | Wire into GameScene |
+| ~~`Human.ts`~~ | ~~`packages/client/src/game/entities/`~~ | ~~Unused~~ | ✅ Now used — NPC extends Human for speech bubbles |
+| ~~`NPC.ts`~~ | ~~`packages/client/src/game/entities/`~~ | ~~Unused~~ | ✅ Now instantiated in GameScene.spawnNPCs() |
 | `PathfindingSystem.ts` | `packages/client/src/game/systems/` | Unused (client) | Delete or wire for local prediction |

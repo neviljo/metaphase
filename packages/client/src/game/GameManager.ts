@@ -3,9 +3,13 @@ import { BootScene } from './scenes/BootScene';
 import { GameScene } from './scenes/GameScene';
 
 let currentPlayerName = '';
+let currentIsNew = true;
+let currentExistingID: string | undefined;
 
-export function createGame(parent: HTMLElement, playerName: string): Phaser.Game {
+export function createGame(parent: HTMLElement, playerName: string, isNew = true, existingID?: string): Phaser.Game {
   currentPlayerName = playerName;
+  currentIsNew = isNew;
+  currentExistingID = existingID;
 
   const game = new Phaser.Game({
     type: Phaser.AUTO,
@@ -14,6 +18,10 @@ export function createGame(parent: HTMLElement, playerName: string): Phaser.Game
     parent,
     backgroundColor: '#000000',
     scene: [BootScene, GameScene],
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH,
+    },
   });
 
   return game;
@@ -21,4 +29,12 @@ export function createGame(parent: HTMLElement, playerName: string): Phaser.Game
 
 export function getPlayerName(): string {
   return currentPlayerName;
+}
+
+export function getIsNew(): boolean {
+  return currentIsNew;
+}
+
+export function getExistingID(): string | undefined {
+  return currentExistingID;
 }

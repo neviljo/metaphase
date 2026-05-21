@@ -172,9 +172,16 @@ export class Player extends MovingEntity {
   }
 
   teleport(door: any): void {
+    const fromX = this.x;
+    const fromY = this.y;
     this.x = door.to.x;
     this.y = door.to.y;
     if (door.orientation) this.orientation = door.orientation;
+    this.route = null;
+    GameServer.instance.moveAtLocation(this, fromX, fromY, this.x, this.y);
+    this.setProperty('x', this.x);
+    this.setProperty('y', this.y);
+    this.updatePacket.updatePosition(this.x, this.y);
     this.manageFoes();
     this.endFight();
   }

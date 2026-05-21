@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 
 export class ItemEntity extends Phaser.GameObjects.Container {
   itemId: number;
+  isChest = false;
   private icon: Phaser.GameObjects.Sprite;
   private sparkle: Phaser.GameObjects.Sprite;
   shadow: Phaser.GameObjects.Sprite;
@@ -35,6 +36,7 @@ export class ItemEntity extends Phaser.GameObjects.Container {
   }
 
   showChest(): void {
+    this.isChest = true;
     this.icon.setFrame('chest');
     this.icon.setOrigin(0, 0);
     this.shadow.setVisible(false);

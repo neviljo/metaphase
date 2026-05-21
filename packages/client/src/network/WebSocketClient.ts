@@ -8,8 +8,12 @@ class WebSocketClient {
   private handler: MsgHandler | null = null;
   private statusCallback: StatusCallback | null = null;
   private pendingMessages: ClientMessage[] = [];
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionalClose = false;
 
   connect(url: string): void {
+    this.intentionalClose = false;
     this.statusCallback?.('connecting');
     this.ws = new WebSocket(url);
 
@@ -19,6 +23,7 @@ class WebSocketClient {
         this.ws?.send(JSON.stringify(msg));
       }
       this.pendingMessages = [];
+      this.startPing();
     };
 
     this.ws.onmessage = (event) => {
@@ -35,8 +40,11 @@ class WebSocketClient {
     };
 
     this.ws.onclose = () => {
+      this.stopPing();
       this.statusCallback?.('disconnected');
-      setTimeout(() => this.connect(url), 2000);
+      if (!this.intentionalClose) {
+        this.reconnectTimer = setTimeout(() => this.connect(url), 2000);
+      }
     };
   }
 
@@ -57,7 +65,28 @@ class WebSocketClient {
   }
 
   close(): void {
+    this.intentionalClose = true;
+    this.stopPing();
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.ws?.close();
+    this.ws = null;
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    this.pingInterval = setInterval(() => {
+      this.send({ type: 'ponq', stamp: parseInt(Date.now().toString().slice(-9)) });
+    }, 5000);
+  }
+
+  private stopPing(): void {
+    if (this.pingInterval !== null) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
   }
 }
 

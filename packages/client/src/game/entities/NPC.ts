@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Human } from './Human';
 import { useGameStore } from '../../store/GameStore';
+import { playSound, SFX } from '../systems/AudioManager';
 
 const ACH_TALK = 3;
 
@@ -63,6 +64,7 @@ export class NPC extends Human {
     const store = useGameStore.getState();
     if (!store.achievements[ACH_TALK]) {
       store.unlockAchievement(ACH_TALK);
+      playSound(SFX.ACHIEVEMENT);
       try { localStorage.setItem('ach3', '1'); } catch {}
     }
   }

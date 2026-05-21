@@ -65,7 +65,7 @@ export class MessageHandler {
     } else {
       if (!this.gs.checkPlayerID(msg.id!)) return;
       this.gs.loadPlayer(this.socketID, msg.id!, () => {
-        // player loaded
+        this.send({ type: 'pid', playerID: msg.id! });
       });
     }
   }

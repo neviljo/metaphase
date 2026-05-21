@@ -81,11 +81,12 @@ export class Being extends Phaser.GameObjects.Container {
 
   setDisplayName(name: string): void {
     this.nameText.setText(name);
+    if (this.isPlayer) {
+      this.nameText.setColor('#ffd700');
+    }
   }
 
-  private moveTweenDuration = 120;
-
-  setPositionTile(tx: number, ty: number, instant = false): void {
+  setPositionTile(tx: number, ty: number, instant = false, latency = 0): void {
     const targetX = tx * 32;
     const targetY = ty * 32;
     const dist = Math.abs(this.x - targetX) + Math.abs(this.y - targetY);
@@ -101,13 +102,15 @@ export class Being extends Phaser.GameObjects.Container {
       this.moveTween.stop();
       this.moveTween = null;
     }
+    const baseDuration = 120;
+    const duration = Math.max(50, baseDuration - latency);
     const dir = ORIENTATION_TO_DIR[this.orientation] || 'down';
     this.playAnim(dir, false);
     this.moveTween = this.scene.tweens.add({
       targets: this,
       x: targetX,
       y: targetY,
-      duration: this.moveTweenDuration,
+      duration,
       ease: 'Linear',
       onComplete: () => {
         this.moveTween = null;

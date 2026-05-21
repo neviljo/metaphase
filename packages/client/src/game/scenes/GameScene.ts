@@ -19,6 +19,7 @@ import {
   createWeaponAnimations,
   createDeathAnimation,
 } from '../systems/AnimationSystem';
+import { playSound, SFX, initAudio, setIntroMusic } from '../systems/AudioManager';
 
 function buildItemsIDmap(db: any): Record<number, string> {
   const map: Record<number, string> = {};
@@ -34,6 +35,8 @@ function buildItemsIDmap(db: any): Record<number, string> {
 
 export class GameScene extends Phaser.Scene {
   private playerName = '';
+  private isNew = true;
+  private existingID: string | undefined;
   private db: any = null;
   private selfPlayer: Player | null = null;
   private playerEntities = new Map<number, Player>();
@@ -83,8 +86,10 @@ export class GameScene extends Phaser.Scene {
     super('Game');
   }
 
-  init(data: { playerName: string }): void {
+  init(data: { playerName: string; isNew: boolean; existingID?: string }): void {
     this.playerName = data.playerName;
+    this.isNew = data.isNew;
+    this.existingID = data.existingID;
   }
 
   create(): void {
@@ -125,6 +130,13 @@ export class GameScene extends Phaser.Scene {
     this.createDeathOverlay();
     this.createChatUI();
 
+    initAudio(this);
+    if (this.cache.audio.exists('intro')) {
+      const music = this.sound.add('intro', { loop: true, volume: 0.3 });
+      music.play();
+      setIntroMusic(music);
+    }
+
     this.worldText = this.add.text(490, 240, 'Connecting...', {
       fontSize: '16px',
       color: '#ffffff',
@@ -151,12 +163,21 @@ export class GameScene extends Phaser.Scene {
       else if (status === 'connected') {
         this.connected = true;
         this.worldText?.setText('Connected! Requesting world...');
-        wsClient.send({
-          type: 'init_world',
-          new: true,
-          name: this.playerName,
-          clientTime: Date.now(),
-        });
+        if (this.isNew) {
+          wsClient.send({
+            type: 'init_world',
+            new: true,
+            name: this.playerName,
+            clientTime: Date.now(),
+          });
+        } else if (this.existingID) {
+          wsClient.send({
+            type: 'init_world',
+            new: false,
+            id: this.existingID,
+            clientTime: Date.now(),
+          });
+        }
       } else if (status === 'error') this.worldText?.setText(`Error: ${err}`);
       else if (status === 'disconnected') {
         this.connected = false;
@@ -180,6 +201,7 @@ export class GameScene extends Phaser.Scene {
         action: { action: 0 },
         or: 4,
       });
+      this.showTargetMarker(tileX, tileY);
     });
   }
 
@@ -247,6 +269,7 @@ export class GameScene extends Phaser.Scene {
       case 'pid':
         this.selfPlayerId = parseInt(msg.playerID, 10);
         useGameStore.getState().setPlayerId(msg.playerID);
+        try { localStorage.setItem('playerID', msg.playerID); } catch {}
         break;
       case 'chat':
         this.addChatMessage(msg.data.id, msg.data.text);
@@ -272,11 +295,19 @@ export class GameScene extends Phaser.Scene {
     useGameStore.getState().setNbConnected(data.nbconnected);
     this.worldText?.setText('');
     this.addPlayer(data.player, true);
+    try {
+      localStorage.setItem('playerName', this.playerName);
+      localStorage.setItem('weapon', 'sword1');
+      localStorage.setItem('armor', 'clotharmor');
+    } catch {}
   }
 
   private handleUpdate(data: any): void {
     if (data.nbconnected !== undefined) {
       useGameStore.getState().setNbConnected(data.nbconnected);
+    }
+    if (data.latency !== undefined) {
+      useGameStore.getState().setLatency(data.latency);
     }
     if (data.global) this.handleGlobalUpdate(data.global);
     if (data.local) this.handleLocalUpdate(data.local);
@@ -318,6 +349,7 @@ export class GameScene extends Phaser.Scene {
         const id = Number(idStr);
         const ent = this.playerEntities.get(id);
         if (!ent) continue;
+        const currentLatency = useGameStore.getState().latency;
         if (id === this.selfPlayerId) {
           if (update.alive === false && this.selfPlayer && this.selfPlayer.alive !== false) {
             this.selfPlayer.alive = false;
@@ -346,7 +378,7 @@ export class GameScene extends Phaser.Scene {
             this.serverTileY = update.y;
             this.checkLocationAchievements(update.x, update.y);
           } else {
-            ent.setPositionTile(update.x, update.y);
+            ent.setPositionTile(update.x, update.y, false, currentLatency);
           }
         }
         if (update.route && update.route.orientation) {
@@ -355,10 +387,18 @@ export class GameScene extends Phaser.Scene {
         if (update.weapon !== undefined) {
           const weaponKey = this.itemsIDmap[update.weapon] || 'sword1';
           ent.equipWeapon(weaponKey);
+          if (id === this.selfPlayerId) {
+            useGameStore.getState().setWeapon(weaponKey);
+            try { localStorage.setItem('weapon', weaponKey); } catch {}
+          }
         }
         if (update.armor !== undefined) {
           const armorKey = this.itemsIDmap[update.armor] || 'clotharmor';
           ent.equipArmor(armorKey);
+          if (id === this.selfPlayerId) {
+            useGameStore.getState().setArmor(armorKey);
+            try { localStorage.setItem('armor', armorKey); } catch {}
+          }
         }
         if (update.route) {
           const r = update.route as any;
@@ -421,6 +461,9 @@ export class GameScene extends Phaser.Scene {
         const id = Number(idStr);
         const ent = this.itemEntities.get(id);
         if (ent && update.visible === false) {
+          if (ent.isChest || update.chest === true) {
+            playSound(SFX.CHEST);
+          }
           ent.setVisible(false);
           this.time.delayedCall(9000, () => {
             ent.destroy();
@@ -448,13 +491,20 @@ export class GameScene extends Phaser.Scene {
           if (this.selfPlayer && h.from !== this.selfPlayerId) {
             this.selfPlayer.attack();
           }
+          playSound(SFX.HIT);
         } else if (this.selfPlayer) {
+          const isHeal = h.hp > 0;
           this.showFloatingHP(
             this.selfPlayer.x / 32,
             this.selfPlayer.y / 32,
-            h.hp > 0 ? h.hp : -h.hp,
+            isHeal ? h.hp : -h.hp,
             false
           );
+          if (isHeal) {
+            playSound(SFX.HEAL);
+          } else {
+            playSound(SFX.HURT);
+          }
           const attacker = this.monsterEntities.get(h.from);
           if (attacker) {
             attacker.target = this.selfPlayer;
@@ -470,6 +520,7 @@ export class GameScene extends Phaser.Scene {
       );
       const name = monsterKey ? (this.monstersInfo[monsterKey].name || monsterKey) : 'Monster';
       this.showNotification(`Killed ${name}!`, 2000);
+      playSound(SFX.KILL);
       this.checkKillAchievements(monsterId);
     }
     if (local.used && local.used.length > 0) {
@@ -485,6 +536,7 @@ export class GameScene extends Phaser.Scene {
     }
     if (local.noPick) {
       this.showNotification('You already have a better item', 2000);
+      playSound(SFX.NOLOOT);
     }
     if (local.x !== undefined && local.y !== undefined && this.selfPlayer) {
       this.selfPlayer.setPositionTile(local.x, local.y, true);
@@ -582,6 +634,7 @@ export class GameScene extends Phaser.Scene {
 
   private showDeathOverlay(): void {
     this.isDead = true;
+    playSound(SFX.DEATH);
     this.deathOverlay.setVisible(true);
     this.deathText.setVisible(true);
     this.reviveButton.setVisible(false);
@@ -598,8 +651,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createChatUI(): void {
-    this.chatText = this.add.text(10, 420, '', {
-      fontSize: '11px',
+    this.chatText = this.add.text(10, 410, '', {
+      fontSize: '14px',
       fontFamily: 'monospace',
       color: '#ffffff',
       stroke: '#000000',
@@ -624,36 +677,30 @@ export class GameScene extends Phaser.Scene {
       background: 'rgba(0,0,0,0.7)',
       color: '#fff',
       outline: 'none',
-      display: 'none',
       zIndex: '1000',
     });
     document.body.appendChild(this.chatInputEl);
 
-    this.chatInputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && this.chatInputEl) {
-        const text = this.chatInputEl.value.trim();
+    const el = this.chatInputEl;
+    el.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        const text = el.value.trim();
         if (text.length > 0) {
           wsClient.send({ type: 'chat', text });
         }
-        this.chatInputEl.value = '';
-        this.chatInputEl.style.display = 'none';
+        el.value = '';
+        el.blur();
       }
-      if (e.key === 'Escape' && this.chatInputEl) {
-        this.chatInputEl.value = '';
-        this.chatInputEl.style.display = 'none';
-      }
-    });
-
-    this.input.keyboard!.on('keydown-ENTER', () => {
-      if (!this.chatInputEl) return;
-      if (this.chatInputEl.style.display === 'none') {
-        this.chatInputEl.style.display = 'block';
-        this.chatInputEl.focus();
+      if (e.key === 'Escape') {
+        el.value = '';
+        el.blur();
       }
     });
   }
 
   private addChatMessage(senderId: number, text: string): void {
+    playSound(SFX.CHAT);
     const name = this.playerEntities.get(senderId)?.nameText.text || `Player${senderId}`;
     this.chatMessages.push(`${name}: ${text}`);
     if (this.chatMessages.length > 50) this.chatMessages.shift();
@@ -661,6 +708,26 @@ export class GameScene extends Phaser.Scene {
     this.time.delayedCall(10000, () => {
       this.chatMessages.shift();
       this.chatText.setText(this.chatMessages.slice(-8).join('\n'));
+    });
+  }
+
+  private showTargetMarker(tileX: number, tileY: number): void {
+    const marker = this.add.graphics();
+    marker.setDepth(50);
+    const cx = tileX * 32 + 16;
+    const cy = tileY * 32 + 16;
+    marker.lineStyle(2, 0xffff00, 0.7);
+    marker.strokeCircle(cx, cy, 6);
+    marker.lineBetween(cx - 10, cy, cx - 4, cy);
+    marker.lineBetween(cx + 4, cy, cx + 10, cy);
+    marker.lineBetween(cx, cy - 10, cx, cy - 4);
+    marker.lineBetween(cx, cy + 4, cx, cy + 10);
+    this.tweens.add({
+      targets: marker,
+      alpha: 0,
+      duration: 800,
+      delay: 400,
+      onComplete: () => marker.destroy(),
     });
   }
 
@@ -776,6 +843,7 @@ export class GameScene extends Phaser.Scene {
       if (triggered) {
         store.unlockAchievement(achId);
         this.showNotification(`Achievement: ${a.name}!`, 3000);
+        playSound(SFX.ACHIEVEMENT);
         this.saveAchievements();
       }
     }
@@ -793,12 +861,14 @@ export class GameScene extends Phaser.Scene {
     if (ratCount >= 10 && !store.achievements[this.ACH_RATS]?.unlocked) {
       store.unlockAchievement(this.ACH_RATS);
       this.showNotification('Achievement: Angry Rats!', 3000);
+      playSound(SFX.ACHIEVEMENT);
       this.saveAchievements();
     }
     const skelCount = store.killCounters['skeleton'] || 0;
     if (skelCount >= 10 && !store.achievements[this.ACH_SKELETONS]?.unlocked) {
       store.unlockAchievement(this.ACH_SKELETONS);
       this.showNotification('Achievement: Bones Collector!', 3000);
+      playSound(SFX.ACHIEVEMENT);
       this.saveAchievements();
     }
   }
@@ -813,11 +883,13 @@ export class GameScene extends Phaser.Scene {
     if (info.type === 1 && !store.achievements[this.ACH_WEAPON]?.unlocked) {
       store.unlockAchievement(this.ACH_WEAPON);
       this.showNotification('Achievement: A True Warrior!', 3000);
+      playSound(SFX.ACHIEVEMENT);
       this.saveAchievements();
     }
     if (info.type === 2 && !store.achievements[this.ACH_ARMOR]?.unlocked) {
       store.unlockAchievement(this.ACH_ARMOR);
       this.showNotification('Achievement: Fat Loot!', 3000);
+      playSound(SFX.ACHIEVEMENT);
       this.saveAchievements();
     }
   }

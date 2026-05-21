@@ -472,6 +472,15 @@ export class GameServer {
     if (!routeEnd) return false;
     if (routeEnd.x === dest.x && routeEnd.y === dest.y) return true;
 
+    if (
+      dest.x < 0 || dest.x >= this.map.width ||
+      dest.y < 0 || dest.y >= this.map.height ||
+      routeEnd.x < 0 || routeEnd.x >= this.map.width ||
+      routeEnd.y < 0 || routeEnd.y >= this.map.height
+    ) {
+      return false;
+    }
+
     // Don't extend if destination reverses direction
     const path = player.route!.path;
     if (path.length >= 2) {
@@ -535,6 +544,14 @@ export class GameServer {
     // Single destination — try extending existing route first, else compute full path
     if (path.length === 1) {
       const dest = path[0];
+      if (
+        dest.x < 0 || dest.x >= this.map.width ||
+        dest.y < 0 || dest.y >= this.map.height ||
+        player.x < 0 || player.x >= this.map.width ||
+        player.y < 0 || player.y >= this.map.height
+      ) {
+        return false;
+      }
       if (player.route && this.extendRoute(player, dest, orientation, action)) {
         return true;
       }

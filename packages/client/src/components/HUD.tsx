@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { isMuted, setMuted } from '../game/systems/AudioManager';
+import { useGameStore } from '../store/GameStore';
+
 interface Props {
   hp: number;
   maxHp: number;
@@ -6,8 +10,17 @@ interface Props {
 }
 
 export default function HUD({ hp, maxHp, nbConnected, latency }: Props) {
+  const [muted, setMutedState] = useState(isMuted());
+  const weapon = useGameStore((s) => s.weapon);
+  const armor = useGameStore((s) => s.armor);
   const ratio = Math.max(0, hp / maxHp);
   const barColor = ratio > 0.5 ? '#00ff00' : ratio > 0.25 ? '#ffaa00' : '#ff0000';
+
+  const toggleMute = () => {
+    const next = !isMuted();
+    setMuted(next);
+    setMutedState(next);
+  };
 
   return (
     <div
@@ -31,8 +44,29 @@ export default function HUD({ hp, maxHp, nbConnected, latency }: Props) {
         <span>{Math.max(0, hp)}/{maxHp}</span>
       </div>
 
-      <div style={{ position: 'absolute', top: 8, right: 10 }}>
+      <div style={{ position: 'absolute', top: 28, left: 10, fontSize: 11, color: '#aaa' }}>
+        Wpn: {weapon} | Arm: {armor}
+      </div>
+
+      <div style={{ position: 'absolute', top: 8, right: 10, pointerEvents: 'auto' }}>
         Players: {nbConnected} | Latency: {latency}ms
+        <button
+          onClick={toggleMute}
+          style={{
+            marginLeft: 8,
+            background: 'none',
+            border: '1px solid #666',
+            color: '#fff',
+            cursor: 'pointer',
+            padding: '2px 6px',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            pointerEvents: 'auto',
+          }}
+          title={muted ? 'Unmute sounds' : 'Mute sounds'}
+        >
+          {muted ? 'Unmute' : 'Mute'}
+        </button>
       </div>
     </div>
   );
