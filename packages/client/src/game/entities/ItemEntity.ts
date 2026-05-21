@@ -32,7 +32,7 @@ export class ItemEntity extends Phaser.GameObjects.Container {
     this.add(this.sparkle);
 
     scene.add.existing(this);
-    this.setDepth(7);
+    this.setDepth(0);
   }
 
   showChest(): void {

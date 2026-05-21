@@ -25,7 +25,7 @@ export class NPC extends Human {
 
     this.bodySprite.setOrigin(0, 0.25);
     this.shadowSprite.setOrigin(0, 0.5);
-    this.setDepth(5);
+    this.setDepth(0);
 
     const animKey = `${npcKey}_idle`;
     if (!scene.anims.exists(animKey)) {

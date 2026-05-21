@@ -73,6 +73,7 @@ export class GameScene extends Phaser.Scene {
   private npcEntities: NPC[] = [];
   private entitiesClientData: any = {};
   private highLayer!: Phaser.Tilemaps.TilemapLayer;
+  private revealedTiles: { x: number; y: number; alpha: number }[] = [];
 
   private readonly ACH_WEAPON = 0;
   private readonly ACH_OUTDOOR = 1;
@@ -122,7 +123,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.highLayer = map.createLayer('highlayer0', tileset, 0, 0)!;
-    this.highLayer.setDepth(4);
+    this.highLayer.setDepth(1000);
 
     this.entitiesClientData = this.cache.json.get('entities_client') || {};
     this.restoreAchievements();
@@ -254,8 +255,10 @@ export class GameScene extends Phaser.Scene {
     const all: { obj: Phaser.GameObjects.Container; y: number }[] = [];
     this.playerEntities.forEach((p) => all.push({ obj: p, y: p.y }));
     this.monsterEntities.forEach((m) => all.push({ obj: m, y: m.y }));
+    for (const npc of this.npcEntities) all.push({ obj: npc, y: npc.y });
+    this.itemEntities.forEach((item) => all.push({ obj: item, y: item.y }));
     all.sort((a, b) => a.y - b.y);
-    all.forEach((item, i) => item.obj.setDepth(i + 5));
+    all.forEach((item, i) => item.obj.setDepth(i + 4));
   }
 
   private handleMessage(msg: any): void {
@@ -666,8 +669,22 @@ export class GameScene extends Phaser.Scene {
 
   private updateRoofVisibility(tileX: number, tileY: number): void {
     if (!this.highLayer) return;
-    const tile = this.highLayer.getTileAt(tileX, tileY);
-    this.highLayer.setVisible(!tile);
+    // Restore previously revealed tiles
+    for (const prev of this.revealedTiles) {
+      const t = this.highLayer.getTileAt(prev.x, prev.y);
+      if (t) t.alpha = prev.alpha;
+    }
+    this.revealedTiles = [];
+    // Fade out highlayer tiles in a 3x3 area around the player
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const tile = this.highLayer.getTileAt(tileX + dx, tileY + dy);
+        if (tile) {
+          this.revealedTiles.push({ x: tileX + dx, y: tileY + dy, alpha: tile.alpha });
+          tile.alpha = 0.3;
+        }
+      }
+    }
   }
 
   private createChatUI(): void {
