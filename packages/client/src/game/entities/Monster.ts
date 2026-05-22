@@ -4,6 +4,7 @@ import { Being } from './Being';
 export class Monster extends Being {
   monsterName = '';
   hitPoints = 100;
+  maxHitPoints = 100;
 
   constructor(
     scene: Phaser.Scene,

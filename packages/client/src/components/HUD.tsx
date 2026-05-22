@@ -7,9 +7,10 @@ interface Props {
   maxHp: number;
   nbConnected: number;
   latency: number;
+  onBack?: () => void;
 }
 
-export default function HUD({ hp, maxHp, nbConnected, latency }: Props) {
+export default function HUD({ hp, maxHp, nbConnected, latency, onBack }: Props) {
   const [muted, setMutedState] = useState(isMuted());
   const weapon = useGameStore((s) => s.weapon);
   const armor = useGameStore((s) => s.armor);
@@ -48,12 +49,11 @@ export default function HUD({ hp, maxHp, nbConnected, latency }: Props) {
         Wpn: {weapon} | Arm: {armor}
       </div>
 
-      <div style={{ position: 'absolute', top: 8, right: 10, pointerEvents: 'auto' }}>
-        Players: {nbConnected} | Latency: {latency}ms
+      <div style={{ position: 'absolute', top: 8, right: 10, pointerEvents: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+        <span>Players: {nbConnected} | Latency: {latency}ms</span>
         <button
           onClick={toggleMute}
           style={{
-            marginLeft: 8,
             background: 'none',
             border: '1px solid #666',
             color: '#fff',
@@ -61,12 +61,28 @@ export default function HUD({ hp, maxHp, nbConnected, latency }: Props) {
             padding: '2px 6px',
             fontSize: 11,
             fontFamily: 'monospace',
-            pointerEvents: 'auto',
           }}
           title={muted ? 'Unmute sounds' : 'Mute sounds'}
         >
           {muted ? 'Unmute' : 'Mute'}
         </button>
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              background: 'none',
+              border: '1px solid #a33',
+              color: '#a33',
+              cursor: 'pointer',
+              padding: '2px 8px',
+              fontSize: 11,
+              fontFamily: 'monospace',
+            }}
+            title="Return to menu"
+          >
+            Exit
+          </button>
+        )}
       </div>
     </div>
   );

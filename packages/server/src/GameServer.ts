@@ -284,13 +284,16 @@ export class GameServer {
       player.setIDs(mongoID, socketID);
       this.finalizePlayer(socketID, player);
       onComplete(mongoID);
+    }).catch((err) => {
+      console.error('Failed to create player:', err);
+      this.broadcaster.sendTo(socketID, { type: 'dbError', message: 'Failed to create player' });
     });
   }
 
   loadPlayer(socketID: string, id: string, onComplete: () => void): void {
     PlayerModel.findById(id).then((doc) => {
       if (!doc) {
-        this.broadcaster.sendTo(socketID, { type: 'dbError' });
+        this.broadcaster.sendTo(socketID, { type: 'dbError', message: 'Player not found' });
         return;
       }
       const player = new Player('');
@@ -299,7 +302,13 @@ export class GameServer {
       player.getDataFromDb(doc.toObject()).then(() => {
         this.finalizePlayer(socketID, player);
         onComplete();
+      }).catch((err) => {
+        console.error('Failed to hydrate player data:', err);
+        this.broadcaster.sendTo(socketID, { type: 'dbError', message: 'Failed to load player data' });
       });
+    }).catch((err) => {
+      console.error('Failed to find player:', err);
+      this.broadcaster.sendTo(socketID, { type: 'dbError', message: 'Database error loading player' });
     });
   }
 

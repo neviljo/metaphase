@@ -271,7 +271,6 @@ export class GameScene extends Phaser.Scene {
         this.handleUpdate(msg.data);
         break;
       case 'pid':
-        this.selfPlayerId = parseInt(msg.playerID, 10);
         useGameStore.getState().setPlayerId(msg.playerID);
         try { localStorage.setItem('playerID', msg.playerID); } catch {}
         break;
@@ -280,6 +279,10 @@ export class GameScene extends Phaser.Scene {
         break;
       case 'wait':
         this.worldText?.setText('Waiting for server...');
+        break;
+      case 'dbError':
+        this.worldText?.setText('Error: ' + (msg.message || 'Database error'));
+        this.connected = false;
         break;
       case 'reset':
         if (this.selfPlayer) {
@@ -359,9 +362,10 @@ export class GameScene extends Phaser.Scene {
         if (id === this.selfPlayerId) {
           if (update.alive === false && this.selfPlayer && this.selfPlayer.alive !== false) {
             this.selfPlayer.alive = false;
+            this.isDead = true;
             this.selfPlayer.bodySprite.play('death');
-            this.time.delayedCall(1500, () => this.showDeathOverlay());
-          } else if (update.alive === true && this.isDead && this.selfPlayer) {
+            this.showDeathOverlay();
+          } else if (update.alive === true && this.selfPlayer && !this.selfPlayer.alive) {
             this.hideDeathOverlay();
             this.selfPlayer.alive = true;
             this.selfPlayer.setVisible(true);
@@ -449,6 +453,7 @@ export class GameScene extends Phaser.Scene {
         } else if (update.alive === true) {
           ent.alive = true;
           ent.setVisible(true);
+          ent.hitPoints = ent.maxHitPoints;
           this.addMonsterHPBar(id, ent);
           ent.idle(true);
         }
@@ -487,35 +492,33 @@ export class GameScene extends Phaser.Scene {
     if (local.hp) {
       for (const h of local.hp) {
         if (h.target) {
+          // Monster attacked the player
+          if (this.selfPlayer) {
+            this.showFloatingHP(
+              this.selfPlayer.x / 32,
+              this.selfPlayer.y / 32,
+              -h.hp,
+              false
+            );
+          }
+          if (this.selfPlayer && h.from !== this.selfPlayerId && this.selfPlayer.alive) {
+            this.selfPlayer.attack();
+          }
+          playSound(SFX.HURT);
+        } else if (this.selfPlayer) {
+          // Player attacked the monster
           const monster = this.monsterEntities.get(h.from);
           if (monster) {
-            if (monster.alive) this.showFloatingHP(monster.x / 32, monster.y / 32, -h.hp, true);
             monster.hitPoints = (monster.hitPoints || 100) - h.hp;
             if (monster.hitPoints < 0) monster.hitPoints = 0;
             this.addMonsterHPBar(h.from, monster);
-          }
-          if (this.selfPlayer && h.from !== this.selfPlayerId) {
-            this.selfPlayer.attack();
+            if (monster.alive) {
+              this.showFloatingHP(monster.x / 32, monster.y / 32, -h.hp, true);
+            }
+            monster.target = this.selfPlayer;
+            monster.attack();
           }
           playSound(SFX.HIT);
-        } else if (this.selfPlayer) {
-          const isHeal = h.hp > 0;
-          this.showFloatingHP(
-            this.selfPlayer.x / 32,
-            this.selfPlayer.y / 32,
-            isHeal ? h.hp : -h.hp,
-            false
-          );
-          if (isHeal) {
-            playSound(SFX.HEAL);
-          } else {
-            playSound(SFX.HURT);
-          }
-          const attacker = this.monsterEntities.get(h.from);
-          if (attacker) {
-            attacker.target = this.selfPlayer;
-            attacker.attack();
-          }
         }
       }
     }
@@ -589,6 +592,7 @@ export class GameScene extends Phaser.Scene {
     const ent = new Monster(this, monster.x, monster.y, monsterKey);
     ent.monsterName = monsterKey;
     ent.hitPoints = hp;
+    ent.maxHitPoints = hp;
     ent.setUp(info.frames, info.customAnchor);
     if (monster.alive === false) {
       ent.setVisible(false);
@@ -793,7 +797,8 @@ export class GameScene extends Phaser.Scene {
       hpBar.setDepth(15);
       this.monsterHPBars.set(monsterId, hpBar);
     }
-    const lifePct = being.hitPoints !== undefined ? being.hitPoints / 100 : 1;
+    const maxHP = being.maxHitPoints || 100;
+    const lifePct = being.hitPoints !== undefined ? being.hitPoints / maxHP : 1;
     hpBar.clear();
     hpBar.fillStyle(0x000000, 0.6);
     hpBar.fillRect(being.x - 16, being.y - 36, 32, 4);

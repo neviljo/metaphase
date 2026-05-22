@@ -25,6 +25,6 @@ export type ServerMessage =
   | { type: 'update'; data: ServerUpdate }
   | { type: 'pid'; playerID: string }
   | { type: 'reset'; data: { x: number; y: number } }
-  | { type: 'dbError' }
+  | { type: 'dbError'; message?: string }
   | { type: 'wait' }
   | { type: 'chat'; data: { id: number; text: string } };

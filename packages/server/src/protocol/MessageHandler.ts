@@ -58,12 +58,18 @@ export class MessageHandler {
       return;
     }
     if (msg.new) {
-      if (!this.gs.checkSocketID(this.socketID)) return;
+      if (!this.gs.checkSocketID(this.socketID)) {
+        this.send({ type: 'dbError', message: 'Session already active' });
+        return;
+      }
       this.gs.addNewPlayer(this.socketID, msg.name || 'Player', (playerID) => {
         this.send({ type: 'pid', playerID });
       });
     } else {
-      if (!this.gs.checkPlayerID(msg.id!)) return;
+      if (!this.gs.checkPlayerID(msg.id!)) {
+        this.send({ type: 'dbError', message: 'Player already connected' });
+        return;
+      }
       this.gs.loadPlayer(this.socketID, msg.id!, () => {
         this.send({ type: 'pid', playerID: msg.id! });
       });
