@@ -493,7 +493,7 @@ export default function HomeScreen({ onStart }: Props) {
 
       <div style={styles.hero}>
         <div style={styles.subtitle}>A browser-based MMORPG</div>
-        <h1 style={styles.title}>PHASER QUEST</h1>
+        <h1 style={styles.title}>META PHASE</h1>
         <div style={styles.tagline}>— An Epic Multiplayer Adventure —</div>
         <button
           style={{ ...styles.playBtn, ...(btnHover ? styles.playBtnHover : {}) }}
