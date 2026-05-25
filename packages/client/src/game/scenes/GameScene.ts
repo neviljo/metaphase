@@ -118,17 +118,15 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapW, mapH);
 
     const layerNames = ['layer0', 'layer1', 'layer2', 'layer3'];
-    const mapLayers: Phaser.Tilemaps.TilemapLayer[] = [];
     for (const name of layerNames) {
       const layer = map.createLayer(name, tileset, 0, 0)!;
       layer.setDepth(0);
-      mapLayers.push(layer);
     }
 
     this.highLayer = map.createLayer('highlayer0', tileset, 0, 0)!;
     this.highLayer.setDepth(1000);
 
-    this.buildCollisionGrid(map, mapLayers);
+    this.buildCollisionGrid(map);
 
     this.entitiesClientData = this.cache.json.get('entities_client') || {};
     this.restoreAchievements();
@@ -261,24 +259,28 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private buildCollisionGrid(map: Phaser.Tilemaps.Tilemap, layers: Phaser.Tilemaps.TilemapLayer[]): void {
-    const tileset = map.tilesets[0];
-    if (!tileset?.tileData) return;
+  private buildCollisionGrid(map: Phaser.Tilemaps.Tilemap): void {
+    const cacheEntry = (this.cache.tilemap.get('map') as any);
+    const mapData = cacheEntry?.data || cacheEntry;
+    if (!mapData?.tilesets?.[0]?.tileproperties) return;
 
-    const collidable = new Set<number>();
-    for (const [idx, props] of Object.entries(tileset.tileData)) {
+    const tileProperties = mapData.tilesets[0].tileproperties as Record<string, any>;
+    const collidableGIDs = new Set<number>();
+    for (const [tileIdStr, props] of Object.entries(tileProperties)) {
       if (props && (props as any).c !== undefined) {
-        collidable.add(parseInt(idx));
+        collidableGIDs.add(parseInt(tileIdStr) + 1);
       }
     }
 
-    for (let y = 0; y < map.height; y++) {
+    const tileLayers = mapData.layers.filter((l: any) => l.type === 'tilelayer');
+    const width = mapData.width;
+    for (let y = 0; y < mapData.height; y++) {
       const row: boolean[] = [];
-      for (let x = 0; x < map.width; x++) {
+      for (let x = 0; x < width; x++) {
         let blocked = false;
-        for (const layer of layers) {
-          const tile = layer.getTileAt(x, y);
-          if (tile && collidable.has(tile.index)) {
+        for (const layer of tileLayers) {
+          const gid = layer.data[y * width + x];
+          if (gid && collidableGIDs.has(gid)) {
             blocked = true;
             break;
           }
