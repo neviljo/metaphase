@@ -74,6 +74,7 @@ export class GameScene extends Phaser.Scene {
   private entitiesClientData: any = {};
   private highLayer!: Phaser.Tilemaps.TilemapLayer;
   private revealedTiles: { x: number; y: number; alpha: number }[] = [];
+  private collisionGrid: boolean[][] = [];
 
   private readonly ACH_WEAPON = 0;
   private readonly ACH_OUTDOOR = 1;
@@ -117,13 +118,17 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, mapW, mapH);
 
     const layerNames = ['layer0', 'layer1', 'layer2', 'layer3'];
+    const mapLayers: Phaser.Tilemaps.TilemapLayer[] = [];
     for (const name of layerNames) {
       const layer = map.createLayer(name, tileset, 0, 0)!;
       layer.setDepth(0);
+      mapLayers.push(layer);
     }
 
     this.highLayer = map.createLayer('highlayer0', tileset, 0, 0)!;
     this.highLayer.setDepth(1000);
+
+    this.buildCollisionGrid(map, mapLayers);
 
     this.entitiesClientData = this.cache.json.get('entities_client') || {};
     this.restoreAchievements();
@@ -242,6 +247,9 @@ export class GameScene extends Phaser.Scene {
     const curY = this.expectedTileY;
     const tileX = curX + dx;
     const tileY = curY + dy;
+
+    if (this.collisionGrid[tileY]?.[tileX]) return;
+
     this.expectedTileX = tileX;
     this.expectedTileY = tileY;
     this.selfPlayer.setPositionTile(tileX, tileY);
@@ -251,6 +259,34 @@ export class GameScene extends Phaser.Scene {
       action: { action: 0 },
       or,
     });
+  }
+
+  private buildCollisionGrid(map: Phaser.Tilemaps.Tilemap, layers: Phaser.Tilemaps.TilemapLayer[]): void {
+    const tileset = map.tilesets[0];
+    if (!tileset?.tileData) return;
+
+    const collidable = new Set<number>();
+    for (const [idx, props] of Object.entries(tileset.tileData)) {
+      if (props && (props as any).c !== undefined) {
+        collidable.add(parseInt(idx));
+      }
+    }
+
+    for (let y = 0; y < map.height; y++) {
+      const row: boolean[] = [];
+      for (let x = 0; x < map.width; x++) {
+        let blocked = false;
+        for (const layer of layers) {
+          const tile = layer.getTileAt(x, y);
+          if (tile && collidable.has(tile.index)) {
+            blocked = true;
+            break;
+          }
+        }
+        row.push(blocked);
+      }
+      this.collisionGrid.push(row);
+    }
   }
 
   private sortEntities(): void {
