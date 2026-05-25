@@ -326,7 +326,8 @@ export default function HomeScreen({ onStart }: Props) {
     const ok = confirm(`Delete character "${existingChar.name}"? This cannot be undone.`);
     if (!ok) return;
     try {
-      const ws = new WebSocket(`ws://${location.hostname}:8081`);
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${location.host}`);
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: 'delete', id: existingChar.playerID }));
         ws.close();

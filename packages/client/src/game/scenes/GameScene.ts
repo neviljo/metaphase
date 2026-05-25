@@ -188,9 +188,11 @@ export class GameScene extends Phaser.Scene {
     });
 
     wsClient.onMessage((msg) => this.handleMessage(msg));
-    wsClient.connect(`ws://${location.hostname}:8081`);
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    wsClient.connect(`${proto}://${location.host}`);
 
     this.events.on('shutdown', () => this.cleanupChat());
+    this.events.on('destroy', () => this.cleanupChat());
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       if (!this.selfPlayer || !this.connected) return;

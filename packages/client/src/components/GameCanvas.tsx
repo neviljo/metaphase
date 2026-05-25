@@ -27,6 +27,9 @@ export default function GameCanvas({ playerName, isNew, existingID }: Props) {
         gameRef.current.destroy(true);
         gameRef.current = null;
       }
+      // Clean up stray chat input that may persist after game destroy
+      const chatInput = document.querySelector<HTMLInputElement>('input[placeholder="Press Enter to chat..."]');
+      chatInput?.remove();
     };
   }, [playerName]);
 
